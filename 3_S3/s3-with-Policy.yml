@@ -1,0 +1,48 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: S3 to store files
+
+Parameters:
+  BucketName:
+    Type: String
+    Default: Put your bucket name here
+  IAMUserName:
+    Type: String
+    Default: Put your IAM user name here
+ IAMPolicyName:
+    Type: String
+    Default: Put your IAM policy name here
+
+Resources:
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub ${BucketName}
+      AccessControl: BucketOwnerFullControl
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+  
+  S3BucketPolicyCrudAccess:
+    Type: 'AWS::IAM::Policy'
+    Properties:
+      PolicyName: !Sub ${IAMPolicyName}
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - s3:PutObject
+              - s3:GetObject
+              - s3:DeleteObject
+            Resource: 
+              - !Sub arn:aws:s3:::${BucketName}
+              - !Sub arn:aws:s3:::${BucketName}/*
+      Users:
+        - !Sub ${IAMUserName}
+
+Outputs:
+  BucketName:
+    Description: S3 to store files
+    Value: !GetAtt S3Bucket.Arn

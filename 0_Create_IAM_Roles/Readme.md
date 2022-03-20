@@ -1,5 +1,8 @@
 # Create required IAM roles
 
+## How to Run
+>aws cloudformation create-stack --stack-name <stack name> --capabilities CAPABILITY_IAM --template-body file://./create-ecs-IAM-roles.yml    
+
 ## EC2InstanceRole  
 
 > Allows EC2 instances in an ECS cluster to access ECS.

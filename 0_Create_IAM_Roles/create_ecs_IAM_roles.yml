@@ -30,6 +30,9 @@ Resources:
               - 'ecs:DescribeServices'
               - 'ecs:UpdateService'
             Resource: '*'
+      Tags:
+      - Key: Name
+        Value: !Sub ${EnvironmentName}-role-EcsAutoscalingRoute
 
   EC2Role:
     Type: AWS::IAM::Role
@@ -60,6 +63,9 @@ Resources:
               - 'ecr:BatchGetImage'
               - 'ecr:GetDownloadUrlForLayer'
             Resource: '*'
+      Tags:
+      - Key: Name
+        Value: !Sub ${EnvironmentName}-role-EcsInstanceRole
 
   ECSRole:
     Type: AWS::IAM::Role
@@ -95,7 +101,10 @@ Resources:
               - 'elasticloadbalancing:RegisterInstancesWithLoadBalancer'
               - 'elasticloadbalancing:RegisterTargets'
             Resource: '*'
-  
+      Tags:
+      - Key: Name
+        Value: !Sub ${EnvironmentName}-role-EcsRole
+
   ECSTaskExecutionRole:
     Type: AWS::IAM::Role
     Properties:
@@ -121,6 +130,9 @@ Resources:
                 - 'logs:CreateLogStream'
                 - 'logs:PutLogEvents'
               Resource: '*'  
+      Tags:
+      - Key: Name
+        Value: !Sub ${EnvironmentName}-role-EcsTaskExecutionRole
 
 Outputs:
   AutoscalingRole:

@@ -1,26 +1,38 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: AWS core resources to create an ECS cluster spanning public and private subnets. Supports
              public facing load balancers.
+Parameters:
+  Prefix:
+    Type: String
+    Default: ecs-course-real-world-ex
+    Description: "Indetifier to architeture template"
+
 Mappings:
   SubnetConfig:
     VPC:
-      CIDR: '10.0.0.0/16'
-    PublicOne:
-      CIDR: '10.0.0.0/24'
-    PublicTwo:
-      CIDR: '10.0.1.0/24'
-    PrivateOne:
-      CIDR: '10.0.2.0/24'
-    PrivateTwo:
-      CIDR: '10.0.3.0/24'
+      CIDR: '10.10.0.0/16'
+    SubnetPublicOne:
+      CIDR: '10.10.0.0/24'
+    SubnetPublicTwo:
+      CIDR: '10.10.1.0/24'
+    SubnetPrivateOne:
+      CIDR: '10.10.2.0/24'
+    SubnetPrivateTwo:
+      CIDR: '10.10.3.0/24'
+
 Resources:
+# vpc --
   VPC:
     Type: AWS::EC2::VPC
     Properties:
       EnableDnsSupport: true
       EnableDnsHostnames: true
       CidrBlock: !FindInMap ['SubnetConfig', 'VPC', 'CIDR']
+      Tags:
+        - Key: Name
+          Value: !Sub ${Prefix}-vpc-a
 
+# subnets --
   PublicSubnetOne:
     Type: AWS::EC2::Subnet
     Properties:
@@ -28,8 +40,12 @@ Resources:
         - 0
         - Fn::GetAZs: !Ref 'AWS::Region'
       VpcId: !Ref 'VPC'
-      CidrBlock: !FindInMap ['SubnetConfig', 'PublicOne', 'CIDR']
+      CidrBlock: !FindInMap ['SubnetConfig', 'SubnetPublicOne', 'CIDR']
       MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${Prefix}-subnet-public-1a
+
   PublicSubnetTwo:
     Type: AWS::EC2::Subnet
     Properties:
@@ -37,8 +53,11 @@ Resources:
         - 1
         - Fn::GetAZs: !Ref 'AWS::Region'
       VpcId: !Ref 'VPC'
-      CidrBlock: !FindInMap ['SubnetConfig', 'PublicTwo', 'CIDR']
+      CidrBlock: !FindInMap ['SubnetConfig', 'SubnetPublicTwo', 'CIDR']
       MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${Prefix}-subnet-public-1b
 
   PrivateSubnetOne:
     Type: AWS::EC2::Subnet
@@ -47,7 +66,11 @@ Resources:
         - 0
         - Fn::GetAZs: !Ref 'AWS::Region'
       VpcId: !Ref 'VPC'
-      CidrBlock: !FindInMap ['SubnetConfig', 'PrivateOne', 'CIDR']
+      CidrBlock: !FindInMap ['SubnetConfig', 'SubnetPrivateOne', 'CIDR']
+      Tags:
+        - Key: Name
+          Value: !Sub ${Prefix}-subnet-private-1a
+
   PrivateSubnetTwo:
     Type: AWS::EC2::Subnet
     Properties:
@@ -55,91 +78,154 @@ Resources:
         - 1
         - Fn::GetAZs: !Ref 'AWS::Region'
       VpcId: !Ref 'VPC'
-      CidrBlock: !FindInMap ['SubnetConfig', 'PrivateTwo', 'CIDR']
+      CidrBlock: !FindInMap ['SubnetConfig', 'SubnetPrivateTwo', 'CIDR']
+      Tags:
+        - Key: Name
+          Value: !Sub ${Prefix}-subnet-private-1b
 
+# igw ---
   InternetGateway:
     Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub ${Prefix}-igw
+
   GatewayAttachement:
     Type: AWS::EC2::VPCGatewayAttachment
     Properties:
       VpcId: !Ref 'VPC'
       InternetGatewayId: !Ref 'InternetGateway'
-  PublicRouteTable:
+
+# public route table ---
+  PublicRouteTableA:
     Type: AWS::EC2::RouteTable
     Properties:
       VpcId: !Ref 'VPC'
-  PublicRoute:
+      Tags:
+        - Key: Name
+          Value: !Sub ${Prefix}-routetable-public-a
+
+  PublicRouteTableAInternetGatewayAttachement:
     Type: AWS::EC2::Route
     DependsOn: GatewayAttachement
     Properties:
-      RouteTableId: !Ref 'PublicRouteTable'
+      RouteTableId: !Ref 'PublicRouteTableA'
       DestinationCidrBlock: '0.0.0.0/0'
       GatewayId: !Ref 'InternetGateway'
-  PublicSubnetOneRouteTableAssociation:
-    Type: AWS::EC2::SubnetRouteTableAssociation
-    Properties:
-      SubnetId: !Ref PublicSubnetOne
-      RouteTableId: !Ref PublicRouteTable
-  PublicSubnetTwoRouteTableAssociation:
-    Type: AWS::EC2::SubnetRouteTableAssociation
-    Properties:
-      SubnetId: !Ref PublicSubnetTwo
-      RouteTableId: !Ref PublicRouteTable
 
-  NatGatewayOneAttachment:
-    Type: AWS::EC2::EIP
-    DependsOn: GatewayAttachement
+  PublicSubnetOneAssociationWithPublicRouteTableA:
+    Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-        Domain: vpc
-  NatGatewayTwoAttachment:
-    Type: AWS::EC2::EIP
-    DependsOn: GatewayAttachement
-    Properties:
-        Domain: vpc
-  NatGatewayOne:
-    Type: AWS::EC2::NatGateway
-    Properties:
-      AllocationId: !GetAtt NatGatewayOneAttachment.AllocationId
       SubnetId: !Ref PublicSubnetOne
-  NatGatewayTwo:
+      RouteTableId: !Ref PublicRouteTableA
+
+  PublicRouteTableB:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref 'VPC'
+      Tags:
+        - Key: Name
+          Value: !Sub ${Prefix}-routetable-public-b
+
+  PublicRouteTableBInternetGatewayAttachement:
+    Type: AWS::EC2::Route
+    DependsOn: GatewayAttachement
+    Properties:
+      RouteTableId: !Ref 'PublicRouteTableB'
+      DestinationCidrBlock: '0.0.0.0/0'
+      GatewayId: !Ref 'InternetGateway'
+
+  PublicSubnetTwoAssociationWithPublicRouteTableB:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnetTwo
+      RouteTableId: !Ref PublicRouteTableB
+
+# private route table ---
+  PrivateRouteTableA:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref 'VPC'
+      Tags:
+        - Key: Name
+          Value: !Sub ${Prefix}-routetable-private-a
+
+  PrivateSubnetOneAssociationWithPrivateRouteTableA:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTableA
+      SubnetId: !Ref PrivateSubnetOne
+
+  NatGatewayAElasticIP:
+    Type: AWS::EC2::EIP
+    DependsOn: GatewayAttachement
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: Name
+          Value: !Sub ${Prefix}-elasticip-natgw-b
+
+  NatGatewayA:
     Type: AWS::EC2::NatGateway
     Properties:
-      AllocationId: !GetAtt NatGatewayTwoAttachment.AllocationId
-      SubnetId: !Ref PublicSubnetTwo
-  PrivateRouteTableOne:
+      AllocationId: !GetAtt NatGatewayAElasticIP.AllocationId
+      SubnetId: !Ref PublicSubnetOne
+      Tags:
+        - Key: Name
+          Value: !Sub ${Prefix}-natgw-a
+
+  PrivateRouteTableAAttachementWithNatGatewayA:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTableA
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGatewayA
+
+# 
+  PrivateRouteTableB:
     Type: AWS::EC2::RouteTable
     Properties:
       VpcId: !Ref 'VPC'
-  PrivateRouteOne:
-    Type: AWS::EC2::Route
-    Properties:
-      RouteTableId: !Ref PrivateRouteTableOne
-      DestinationCidrBlock: 0.0.0.0/0
-      NatGatewayId: !Ref NatGatewayOne
-  PrivateRouteTableOneAssociation:
+      Tags:
+        - Key: Name
+          Value: !Sub ${Prefix}-routetable-private-b
+
+  PrivateSubnetTwoAssociationWithPrivateRouteTableB:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      RouteTableId: !Ref PrivateRouteTableOne
-      SubnetId: !Ref PrivateSubnetOne
-  PrivateRouteTableTwo:
-    Type: AWS::EC2::RouteTable
-    Properties:
-      VpcId: !Ref 'VPC'
-  PrivateRouteTwo:
-    Type: AWS::EC2::Route
-    Properties:
-      RouteTableId: !Ref PrivateRouteTableTwo
-      DestinationCidrBlock: 0.0.0.0/0
-      NatGatewayId: !Ref NatGatewayTwo
-  PrivateRouteTableTwoAssociation:
-    Type: AWS::EC2::SubnetRouteTableAssociation
-    Properties:
-      RouteTableId: !Ref PrivateRouteTableTwo
+      RouteTableId: !Ref PrivateRouteTableB
       SubnetId: !Ref PrivateSubnetTwo
 
-  ####
+  NatGatewayBElasticIP:
+    Type: AWS::EC2::EIP
+    DependsOn: GatewayAttachement
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: Name
+          Value: !Sub ${Prefix}-elasticip-natgw-b
+
+  NatGatewayB:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt NatGatewayBElasticIP.AllocationId
+      SubnetId: !Ref PublicSubnetTwo
+      Tags:
+        - Key: Name
+          Value: !Sub ${Prefix}-natgw-b
+
+  PrivateRouteTableBAttachementWithNatGatewayB:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTableB
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGatewayB
+
+
+  ###
   # ALB related resources
-  ####
+  ###
   PublicLoadBalancerSG:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -147,10 +233,15 @@ Resources:
       VpcId: !Ref 'VPC'
       SecurityGroupIngress:
           - CidrIp: 0.0.0.0/0
-            IpProtocol: -1
-  PublicLoadBalancer:
+            IpProtocol: -1 # all type of traffic
+      Tags:
+        - Key: Name
+          Value: !Sub ${Prefix}-securitygroup-lb-public-access
+
+  PublicApplicationLoadBalancer: 
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:
+      Name: !Sub ${Prefix}-public-loadbalancer
       Scheme: internet-facing
       LoadBalancerAttributes:
       - Key: idle_timeout.timeout_seconds
@@ -159,6 +250,7 @@ Resources:
         - !Ref 'PublicSubnetOne'
         - !Ref 'PublicSubnetTwo'
       SecurityGroups: [!Ref 'PublicLoadBalancerSG']
+
   # A dummy target group is used to setup the ALB to just drop traffic
   # initially, before any real service target groups have been added.
   DummyTargetGroupPublic:
@@ -173,24 +265,27 @@ Resources:
       Protocol: HTTP
       UnhealthyThresholdCount: 2
       VpcId: !Ref 'VPC'
+
   PublicLoadBalancerListener:
     Type: AWS::ElasticLoadBalancingV2::Listener
     DependsOn:
-      - PublicLoadBalancer
+      - PublicApplicationLoadBalancer
     Properties:
       DefaultActions:
         - TargetGroupArn: !Ref 'DummyTargetGroupPublic'
           Type: 'forward'
-      LoadBalancerArn: !Ref 'PublicLoadBalancer'
+      LoadBalancerArn: !Ref 'PublicApplicationLoadBalancer'
       Port: 80
       Protocol: HTTP
+
   ####
   # ECS related resources
   ####
   ECSCluster:
     Type: AWS::ECS::Cluster
     Properties:
-      ClusterName: 'enhanced-architecture-fargate'
+      ClusterName: !Sub ${Prefix}-cluster-fargate
+
   ContainerSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -198,11 +293,13 @@ Resources:
       VpcId: !Ref 'VPC'
       SecurityGroupIngress:
         - IpProtocol: tcp
-          FromPort: 0
-          ToPort: 65535
+          FromPort: 0 # dynamic ports
+          ToPort: 65535 # dynamic ports
           SourceSecurityGroupId: !Ref 'PublicLoadBalancerSG'
-  
-######################################
+      Tags:
+      - Key: Name
+        Value: !Sub ${Prefix}-securitygroup-ecscluster-public-access
+#####################################
 Outputs:
   VpcId:
     Description: The ID of the VPC that this stack is deployed in
@@ -221,4 +318,4 @@ Outputs:
     Value: !Ref 'PrivateSubnetTwo'
   ExternalUrl:
     Description: The url of the external load balancer
-    Value: !Sub http://${PublicLoadBalancer.DNSName}
+    Value: !Sub http://${PublicApplicationLoadBalancer.DNSName}
